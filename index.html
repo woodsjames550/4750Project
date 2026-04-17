@@ -1395,7 +1395,6 @@
             <button class="filter-btn" data-filter="competitions">Competitions</button>
         </div>
         <div class="events-grid" id="eventsGrid">
-            <!-- Static sample events + dynamic from Supabase -->
             <div class="event-card" data-category="classes">
                 <div class="event-date"><span class="day">15</span><span class="month">JUN</span></div>
                 <div class="event-details">
@@ -1544,10 +1543,10 @@
 </footer>
 
 <!-- ================================================================
-     SUPABASE CONFIG — REPLACE THESE TWO VALUES
+     SUPABASE CONFIG
 ================================================================ -->
 <script>
-    const SUPABASE_URL  = 'https://zwpiidesewukqxanowng.supabase.co';
+    const SUPABASE_URL      = 'https://zwpiidesewukqxanowng.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp3cGlpZGVzZXd1a3F4YW5vd25nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1Nzc4OTIsImV4cCI6MjA5MTE1Mzg5Mn0._mqjUoyWn2OE3ydRfsT6-QAf2vnBaPE4gHRv1p_4Fmk';
 
     const { createClient } = supabase;
@@ -1590,46 +1589,50 @@ document.getElementById('membershipInfoBtn').addEventListener('click', () => {
 });
 
 /* ──────────────────────────────────────────
-   RENTAL BUTTONS → SAVE TO SUPABASE
+   RENTAL BUTTONS → SUPABASE
+   Uses event delegation so it works inside hidden tabs
 ────────────────────────────────────────── */
-document.querySelectorAll('.rental-btn').forEach(btn => {
-    btn.addEventListener('click', async function () {
-        const item_name = this.getAttribute('data-rental');
-        try {
-            const { error } = await db.from('rentals').insert({ item_name, status: 'pending' });
-            if (error) throw error;
-            alert(`Rental request for "${item_name}" submitted! Staff will contact you to confirm availability.`);
-        } catch (err) {
-            console.error(err);
-            alert('Rental request failed. Please try again.');
-        }
-    });
+document.addEventListener('click', async function(e) {
+    const btn = e.target.closest('.rental-btn');
+    if (!btn) return;
+    const item_name = btn.getAttribute('data-rental');
+    const member_name = prompt(`Enter your name to rent "${item_name}":`);
+    if (!member_name || !member_name.trim()) return;
+    try {
+        const { error } = await db.from('rentals').insert({
+            item_name,
+            member_name: member_name.trim(),
+            status: 'pending'
+        });
+        if (error) throw error;
+        alert(`Rental request for "${item_name}" submitted! Staff will contact you to confirm availability.`);
+    } catch (err) {
+        console.error(err);
+        alert('Rental request failed. Please try again.');
+    }
 });
 
 /* ──────────────────────────────────────────
-   DAYCARE BOOKING → SAVE TO SUPABASE
+   DAYCARE BOOKING → SUPABASE
 ────────────────────────────────────────── */
-const daycareForm   = document.getElementById('daycareBookingForm');
-const daycareStatus = document.getElementById('daycareStatus');
-
-daycareForm.addEventListener('submit', async (e) => {
+document.getElementById('daycareBookingForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+    const daycareStatus = document.getElementById('daycareStatus');
     const booking = {
-        parent_name:  document.getElementById('parentName').value.trim(),
-        child_name:   document.getElementById('childName').value.trim(),
-        child_age:    document.getElementById('childAge').value,
-        booking_date: document.getElementById('bookingDate').value,
-        start_time:   document.getElementById('startTime').value,
-        duration:     document.getElementById('duration').value,
+        parent_name:   document.getElementById('parentName').value.trim(),
+        child_name:    document.getElementById('childName').value.trim(),
+        child_age:     document.getElementById('childAge').value,
+        booking_date:  document.getElementById('bookingDate').value,
+        start_time:    document.getElementById('startTime').value,
+        duration:      document.getElementById('duration').value,
         special_notes: document.getElementById('specialNotes').value.trim(),
     };
-
     try {
         const { error } = await db.from('daycare_bookings').insert(booking);
         if (error) throw error;
         daycareStatus.textContent = `✓ ${booking.child_name} is booked for ${booking.duration} on ${booking.booking_date} at ${booking.start_time}. Please arrive 10 minutes early.`;
         daycareStatus.className = 'status-msg success';
-        daycareForm.reset();
+        e.target.reset();
         setTimeout(() => { daycareStatus.className = 'status-msg'; daycareStatus.textContent = ''; }, 8000);
     } catch (err) {
         console.error(err);
@@ -1639,7 +1642,7 @@ daycareForm.addEventListener('submit', async (e) => {
 });
 
 /* ──────────────────────────────────────────
-   CHECK-IN FORM → SAVE TO SUPABASE
+   CHECK-IN → LOAD & SAVE TO SUPABASE
 ────────────────────────────────────────── */
 async function loadRecentCheckins() {
     try {
@@ -1648,13 +1651,11 @@ async function loadRecentCheckins() {
             .select('*')
             .order('checked_in_at', { ascending: false })
             .limit(8);
-
         const list = document.getElementById('recentCheckins');
         if (error || !data || data.length === 0) {
             list.innerHTML = '<p style="color:var(--muted);font-size:0.85rem;">No check-ins yet today.</p>';
             return;
         }
-
         list.innerHTML = data.map(c => {
             const initials = c.member_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
             const time = new Date(c.checked_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -1668,9 +1669,7 @@ async function loadRecentCheckins() {
                     <span class="time">${time}</span>
                 </div>`;
         }).join('');
-    } catch (err) {
-        console.error(err);
-    }
+    } catch (err) { console.error(err); }
 }
 
 document.getElementById('checkinForm').addEventListener('submit', async (e) => {
@@ -1678,7 +1677,6 @@ document.getElementById('checkinForm').addEventListener('submit', async (e) => {
     const member_id   = document.getElementById('memberId').value.trim();
     const member_name = document.getElementById('memberName').value.trim();
     const statusEl    = document.getElementById('checkinStatus');
-
     try {
         const { error } = await db.from('checkins').insert({ member_id, member_name });
         if (error) throw error;
@@ -1697,7 +1695,7 @@ document.getElementById('checkinForm').addEventListener('submit', async (e) => {
 loadRecentCheckins();
 
 /* ──────────────────────────────────────────
-   SOCIAL FEED → SAVE & LOAD FROM SUPABASE
+   SOCIAL FEED → LOAD & SAVE (author column)
 ────────────────────────────────────────── */
 function timeAgo(dateStr) {
     const diff = Date.now() - new Date(dateStr).getTime();
@@ -1709,6 +1707,9 @@ function timeAgo(dateStr) {
     return `${Math.floor(hrs / 24)}d ago`;
 }
 
+// Keep a local cache of posts so like clicks can find their post
+let postsCache = [];
+
 async function loadPosts() {
     try {
         const { data, error } = await db
@@ -1716,63 +1717,60 @@ async function loadPosts() {
             .select('*')
             .order('created_at', { ascending: false })
             .limit(20);
-
         const feed = document.getElementById('postsFeed');
         if (error || !data || data.length === 0) {
             feed.innerHTML = '<p style="color:var(--muted);font-size:0.88rem;text-align:center;padding:2rem 0;">No posts yet. Be the first to share!</p>';
+            postsCache = [];
             return;
         }
-
+        postsCache = data;
         feed.innerHTML = data.map(p => {
-            const initials = p.author_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+            const initials = (p.author || 'A').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
             return `
                 <div class="post-card">
                     <div class="post-header">
                         <div class="post-avatar">${initials}</div>
                         <div>
-                            <h4>${p.author_name}</h4>
+                            <h4>${p.author || 'Anonymous'}</h4>
                             <span class="post-time">${timeAgo(p.created_at)}</span>
                         </div>
                     </div>
                     <p class="post-body">${p.content}</p>
                     <div class="post-stats">
-                        <span data-post-id="${p.id}" class="like-btn"><i class="far fa-heart"></i> ${p.likes} likes</span>
+                        <span data-post-id="${p.id}" class="like-btn"><i class="far fa-heart"></i> ${p.likes || 0} likes</span>
                         <span><i class="far fa-comment"></i> Comment</span>
                     </div>
                 </div>`;
         }).join('');
-
-        // Like button handlers
-        document.querySelectorAll('.like-btn').forEach(btn => {
-            btn.addEventListener('click', async function() {
-                const postId = this.getAttribute('data-post-id');
-                const post   = data.find(p => p.id == postId);
-                if (!post) return;
-                const newLikes = (post.likes || 0) + 1;
-                await db.from('posts').update({ likes: newLikes }).eq('id', postId);
-                post.likes = newLikes;
-                this.innerHTML = `<i class="fas fa-heart" style="color:var(--red)"></i> ${newLikes} likes`;
-            });
-        });
-
-    } catch (err) {
-        console.error(err);
-    }
+    } catch (err) { console.error(err); }
 }
+
+// Event delegation for like buttons — works after DOM is rebuilt by loadPosts()
+document.addEventListener('click', async function(e) {
+    const btn = e.target.closest('.like-btn');
+    if (!btn) return;
+    const postId = btn.getAttribute('data-post-id');
+    const post   = postsCache.find(p => p.id == postId);
+    if (!post) return;
+    const newLikes = (post.likes || 0) + 1;
+    const { error } = await db.from('posts').update({ likes: newLikes }).eq('id', postId);
+    if (!error) {
+        post.likes = newLikes;
+        btn.innerHTML = `<i class="fas fa-heart" style="color:var(--red)"></i> ${newLikes} likes`;
+    }
+});
 
 document.getElementById('postBtn').addEventListener('click', async () => {
     const content     = document.getElementById('postContent').value.trim();
-    const author_name = document.getElementById('postAuthor').value.trim() || 'Anonymous';
+    const authorInput = document.getElementById('postAuthor').value.trim() || 'Anonymous';
     const statusEl    = document.getElementById('postStatus');
-
     if (!content) {
         statusEl.textContent = 'Write something before posting.';
         statusEl.className = 'status-msg error';
         return;
     }
-
     try {
-        const { error } = await db.from('posts').insert({ content, author_name, likes: 0 });
+        const { error } = await db.from('posts').insert({ content, author: authorInput, likes: 0 });
         if (error) throw error;
         document.getElementById('postContent').value = '';
         statusEl.textContent = 'Post shared!';
@@ -1789,53 +1787,56 @@ document.getElementById('postBtn').addEventListener('click', async () => {
 loadPosts();
 
 /* ──────────────────────────────────────────
-   EVENTS — RSVP BUTTONS → SUPABASE
+   EVENTS — RSVP (event delegation)
+   Buttons are inside a hidden tab on load,
+   so direct querySelectorAll binding fails.
 ────────────────────────────────────────── */
-document.querySelectorAll('.rsvp-btn').forEach(btn => {
-    btn.addEventListener('click', async function() {
-        const eventName  = this.getAttribute('data-event');
-        const memberName = prompt('Enter your name to RSVP:');
-        if (!memberName) return;
+document.addEventListener('click', async function(e) {
+    const btn = e.target.closest('.rsvp-btn');
+    if (!btn || btn.disabled) return;
+    const eventName  = btn.getAttribute('data-event');
+    const memberName = prompt(`Enter your name to RSVP for "${eventName}":`);
+    if (!memberName || !memberName.trim()) return;
+    try {
+        const { error } = await db.from('rsvps').insert({
+            event_name:  eventName,
+            member_name: memberName.trim()
+        });
+        if (error) throw error;
+        btn.textContent = "✓ RSVP'd";
+        btn.classList.add('rsvpd');
+        btn.disabled = true;
+    } catch (err) {
+        console.error(err);
+        alert('RSVP failed. Please try again.');
+    }
+});
 
-        try {
-            // Find event id by title from Supabase, or just log the RSVP
-            const { error } = await db.from('rsvps').insert({ event_id: null, member_name: memberName });
-            if (error) throw error;
-            this.textContent = '✓ RSVP\'d';
-            this.classList.add('rsvpd');
-            this.disabled = true;
-        } catch (err) {
-            console.error(err);
-            alert('RSVP failed. Please try again.');
-        }
+/* ──────────────────────────────────────────
+   EVENTS — FILTER (event delegation)
+────────────────────────────────────────── */
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.filter-btn');
+    if (!btn) return;
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const filter = btn.getAttribute('data-filter');
+    document.querySelectorAll('.event-card').forEach(card => {
+        card.style.display = (filter === 'all' || card.getAttribute('data-category') === filter) ? '' : 'none';
     });
 });
 
 /* ──────────────────────────────────────────
-   EVENTS — FILTER BUTTONS
+   WORKOUT — CATEGORY FILTER (event delegation)
 ────────────────────────────────────────── */
-document.querySelectorAll('.filter-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-        this.classList.add('active');
-        const filter = this.getAttribute('data-filter');
-        document.querySelectorAll('.event-card').forEach(card => {
-            card.style.display = (filter === 'all' || card.getAttribute('data-category') === filter) ? '' : 'none';
-        });
-    });
-});
-
-/* ──────────────────────────────────────────
-   WORKOUT — CATEGORY FILTER
-────────────────────────────────────────── */
-document.querySelectorAll('.category-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-        document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
-        this.classList.add('active');
-        const cat = this.getAttribute('data-category');
-        document.querySelectorAll('.video-card').forEach(card => {
-            card.style.display = (cat === 'all' || card.getAttribute('data-category') === cat) ? '' : 'none';
-        });
+document.addEventListener('click', function(e) {
+    const btn = e.target.closest('.category-btn');
+    if (!btn) return;
+    document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const cat = btn.getAttribute('data-category');
+    document.querySelectorAll('.video-card').forEach(card => {
+        card.style.display = (cat === 'all' || card.getAttribute('data-category') === cat) ? '' : 'none';
     });
 });
 </script>
